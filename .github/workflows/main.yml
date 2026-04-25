@@ -1,4 +1,4 @@
-name: Build OwO Selfbot APK
+name: Build APK
 
 on:
   push:
@@ -7,21 +7,46 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    
+    runs-on: ubuntu-20.04  # Use older, more stable Ubuntu
+    timeout-minutes: 120
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
+      - name: Setup Python 3.8
+        uses: actions/setup-python@v5
         with:
-          command: buildozer android debug
-          buildozer_version: stable
+          python-version: '3.8'  # More compatible with Buildozer
 
-      - name: Upload APK
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          df -h
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git zip unzip \
+            openjdk-11-jdk autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libtinfo5 cmake libffi-dev libssl-dev
+
+      - name: Install Buildozer
+        run: |
+          pip3 install --upgrade pip
+          pip3 install buildozer==1.4.0 cython==0.29.33
+
+      - name: Build
+        run: |
+          buildozer android debug
+        env:
+          BUILDOZER_WARN_ON_ROOT: 0
+
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: owo-selfbot-apk
-          path: ${{ steps.buildozer.outputs.filename }}
+          name: apk
+          path: bin/*.apk
