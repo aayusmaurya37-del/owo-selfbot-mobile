@@ -1,22 +1,27 @@
-name: Build APK
+name: Build APK (Fast)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v2
-      
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Build with Buildozer
         uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
         with:
           command: buildozer android debug
-          
+          buildozer_version: stable
+
       - name: Upload APK
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
-          name: owo-selfbot.apk
-          path: bin/*.apk
+          name: owo-selfbot-app
+          path: ${{ steps.buildozer.outputs.filename }}
