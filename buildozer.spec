@@ -6,22 +6,24 @@ package.domain = org.owobot
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json
 
-version = 1.0.0
+version = 1.0
 
-# ONLY WORKING DEPENDENCIES FOR ANDROID
-requirements = python3,kivy==2.2.0,requests,certifi
+# Minimal requirements that WILL compile
+requirements = python3,kivy==2.1.0,requests
 
 orientation = portrait
 fullscreen = 0
 
 android.permissions = INTERNET,ACCESS_NETWORK_STATE,WAKE_LOCK
-android.api = 33
+
+# Use older, more stable versions
+android.api = 31
 android.minapi = 21
 android.ndk = 25b
-android.accept_sdk_license = True
 android.archs = arm64-v8a
 
-p4a.branch = develop
+# Use older p4a that works better
+p4a.branch = master
 p4a.bootstrap = sdl2
 
 [buildozer]
