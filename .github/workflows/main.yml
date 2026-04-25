@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build Android APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04   # 👈 THIS IS THE MAGIC FIX (Do not use ubuntu-latest)
     timeout-minutes: 120
 
     steps:
@@ -38,48 +38,33 @@ jobs:
             libswscale-dev \
             libavformat-dev \
             libavcodec-dev \
-            zlib1g-dev
+            zlib1g-dev \
+            libffi-dev \
+            libssl-dev \
+            zip \
+            unzip \
+            autoconf \
+            libtool \
+            pkg-config
 
-      - name: Install Buildozer
+      - name: Install Buildozer & Cython
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install buildozer==1.5.0 cython==0.29.33
 
-      - name: Cache Buildozer global
-        uses: actions/cache@v4
-        with:
-          path: .buildozer_global
-          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
-
-      - name: Cache Buildozer
-        uses: actions/cache@v4
-        with:
-          path: .buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-${{ runner.os }}-
+      - name: Clear corrupted cache
+        run: rm -rf .buildozer
 
       - name: Build APK
         run: |
-          buildozer -v android debug
+          yes | buildozer -v android debug
         env:
           BUILDOZER_WARN_ON_ROOT: 0
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: owo-selfbot-debug
+          name: owo-selfbot-mobile-apk
           path: bin/*.apk
           retention-days: 30
           if-no-files-found: error
-
-      - name: Build Summary
-        if: success()
-        run: |
-          APK_FILE=$(find bin -name "*.apk" | head -1)
-          APK_SIZE=$(du -h "$APK_FILE" | cut -f1)
-          echo "### ✅ Build Successful!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **APK Size:** $APK_SIZE" >> $GITHUB_STEP_SUMMARY
-          echo "- **File:** $(basename $APK_FILE)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Download:** Available in Artifacts section below" >> $GITHUB_STEP_SUMMARY
