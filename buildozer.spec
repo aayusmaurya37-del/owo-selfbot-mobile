@@ -8,8 +8,8 @@ source.include_exts = py,png,jpg,kv,atlas,json
 
 version = 1.0.0
 
-# PINNED VERSIONS TO FIX COMPILER CRASH
-requirements = python3,kivy==2.2.0,discord.py-self==1.9.2,aiohttp==3.8.5,certifi,yarl,multidict,idna,charset-normalizer
+# ONLY WORKING DEPENDENCIES FOR ANDROID
+requirements = python3,kivy==2.2.0,requests,certifi
 
 orientation = portrait
 fullscreen = 0
@@ -19,8 +19,6 @@ android.api = 33
 android.minapi = 21
 android.ndk = 25b
 android.accept_sdk_license = True
-
-# BUILD 64-BIT ONLY TO PREVENT GITHUB ACTIONS OUT-OF-MEMORY CRASH
 android.archs = arm64-v8a
 
 p4a.branch = develop
