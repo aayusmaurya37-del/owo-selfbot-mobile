@@ -1,84 +1,66 @@
 # bot_core.py
-import discord
-import aiohttp
+import requests
+import time
 import asyncio
-from json import load, dump
 from random import randrange
-from re import findall
-from time import time
-from base64 import b64encode
-from datetime import timedelta
 
-class BotCore(discord.Client):
-    """Modified Discord Client for mobile"""
+class BotCore:
+    """Discord bot using REST API instead of discord.py"""
     
     def __init__(self, config, status_callback=None):
-        super().__init__(guild_subscription_options=discord.GuildSubscriptionOptions.off())
         self.config = config
         self.status_callback = status_callback
         self.is_running = False
         self.total_cmds = 0
-        self.start_balance = 0
-        self.next_daily = 0
-        self.owo = 408785106942164992
-        self.channel = None
-        self.tasks_list = []
+        self.base_url = "https://discord.com/api/v10"
+        self.headers = {
+            "Authorization": config['token'],
+            "Content-Type": "application/json"
+        }
+        self.channel_id = str(config['channel'])
         
     def log(self, message, level="INFO"):
         """Send log to UI"""
         if self.status_callback:
             self.status_callback(f"[{level}] {message}")
     
-    async def get_balance(self):
-        """Fetch current balance"""
+    def send_message(self, content):
+        """Send message via REST API"""
         try:
-            await self.channel.send("owo cash")
-            await asyncio.sleep(3)
-            async for message in self.channel.history(limit=15):
-                if message.author.id == self.owo and self.user.name in message.content:
-                    content = message.content
-                    return int("".join(findall("[0-9]+", content[content.find("have"):])))
-        except:
-            return self.start_balance
-        return self.start_balance
-    
-    async def use_gems(self):
-        """Use gems automatically"""
-        try:
-            await self.channel.send("owo inv")
-            self.log("Checking gems...")
-            await asyncio.sleep(3)
-            
-            async for message in self.channel.history(limit=15):
-                if message.author.id == self.owo and self.user.name in message.content:
-                    inv = findall(r"`(.*?)`", message.content)
-                    if "050" in inv:
-                        await self.channel.send("owo lootbox all")
-                        self.log("Opened lootboxes")
-                        await asyncio.sleep(3)
-                    
-                    gems = [item for item in inv if item.isdigit() and 50 < int(item) < 100]
-                    if gems:
-                        await self.channel.send(f"owo use {' '.join(gems[:3])}")
-                        self.log(f"Used gems: {', '.join(gems[:3])}")
-                    break
+            url = f"{self.base_url}/channels/{self.channel_id}/messages"
+            data = {"content": content}
+            response = requests.post(url, headers=self.headers, json=data, timeout=10)
+            return response.status_code == 200
         except Exception as e:
-            self.log(f"Gem error: {str(e)}", "ERROR")
+            self.log(f"Send error: {str(e)}", "ERROR")
+            return False
+    
+    def get_messages(self, limit=10):
+        """Get recent messages"""
+        try:
+            url = f"{self.base_url}/channels/{self.channel_id}/messages?limit={limit}"
+            response = requests.get(url, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            return []
+        except:
+            return []
     
     async def hunt_battle_loop(self):
         """Main hunt/battle loop"""
         while self.is_running:
             try:
-                await self.channel.send("owo hunt")
-                self.log("Sent: owo hunt")
-                self.total_cmds += 1
+                if self.send_message("owo hunt"):
+                    self.log("Sent: owo hunt")
+                    self.total_cmds += 1
+                
                 await asyncio.sleep(3)
                 
-                await self.channel.send("owo battle")
-                self.log("Sent: owo battle")
-                self.total_cmds += 1
+                if self.send_message("owo battle"):
+                    self.log("Sent: owo battle")
+                    self.total_cmds += 1
                 
-                await asyncio.sleep(randrange(14, 19))
+                await asyncio.sleep(randrange(15, 20))
             except Exception as e:
                 self.log(f"Hunt/Battle error: {str(e)}", "ERROR")
                 await asyncio.sleep(10)
@@ -88,89 +70,67 @@ class BotCore(discord.Client):
         while self.is_running:
             try:
                 if self.config.get("pm", False):
-                    await self.channel.send("owo pray")
-                    self.log("Sent: owo pray")
-                await asyncio.sleep(240)  # 4 minutes
+                    if self.send_message("owo pray"):
+                        self.log("Sent: owo pray")
+                await asyncio.sleep(300)
             except Exception as e:
                 self.log(f"Pray error: {str(e)}", "ERROR")
                 await asyncio.sleep(10)
     
     async def daily_loop(self):
-        """Daily claim loop"""
+        """Daily loop"""
         while self.is_running:
             try:
-                if self.config.get("daily", False) and time() >= self.next_daily:
-                    await self.channel.send("owo daily")
-                    self.log("Claiming daily...")
-                    await asyncio.sleep(3)
-                    
-                    async for message in self.channel.history(limit=15):
-                        if message.author.id == self.owo:
-                            if "Nu" in message.content:
-                                next_time = findall("[0-9]+", message.content)
-                                if len(next_time) >= 3:
-                                    seconds = int(next_time[0])*3600 + int(next_time[1])*60 + int(next_time[2])
-                                    self.next_daily = time() + seconds
-                                    self.log(f"Next daily in {seconds//3600}h")
-                            elif "daily" in message.content.lower():
-                                self.log("Daily claimed!")
-                            break
-                
-                await asyncio.sleep(30)
+                if self.config.get("daily", False):
+                    if self.send_message("owo daily"):
+                        self.log("Claimed daily")
+                await asyncio.sleep(86400)  # 24 hours
             except Exception as e:
                 self.log(f"Daily error: {str(e)}", "ERROR")
-                await asyncio.sleep(10)
+                await asyncio.sleep(60)
     
     async def sell_loop(self):
-        """Auto sell loop"""
+        """Sell loop"""
         while self.is_running:
             try:
                 if self.config.get("sell", {}).get("enable", False):
                     types = self.config["sell"].get("types", "c")
-                    await self.channel.send(f"owo sell {types}")
-                    self.log(f"Sold animals: {types}")
-                await asyncio.sleep(120)  # 2 minutes
+                    if self.send_message(f"owo sell {types}"):
+                        self.log(f"Sold: {types}")
+                await asyncio.sleep(180)
             except Exception as e:
                 self.log(f"Sell error: {str(e)}", "ERROR")
-                await asyncio.sleep(10)
-    
-    async def on_ready(self):
-        """On bot ready"""
-        self.log(f"Logged in as {self.user.name}")
-        self.channel = self.get_channel(self.config["channel"])
-        
-        if not self.channel:
-            self.log("Invalid channel ID!", "ERROR")
-            return
-        
-        self.start_balance = await self.get_balance()
-        self.log(f"Starting balance: {self.start_balance:,}")
-        
-        # Start tasks
-        if self.is_running:
-            self.tasks_list = [
-                asyncio.create_task(self.hunt_battle_loop()),
-                asyncio.create_task(self.pray_loop()),
-                asyncio.create_task(self.daily_loop()),
-                asyncio.create_task(self.sell_loop()),
-            ]
-    
-    async def on_message(self, message):
-        """Check for verification"""
-        if message.author.id == self.owo and self.user.name in message.content:
-            if "⚠" in message.content or "captcha" in message.content.lower():
-                self.log("⚠️ VERIFICATION DETECTED!", "CRITICAL")
-                await self.stop_bot()
+                await asyncio.sleep(60)
     
     async def start_bot(self):
         """Start the bot"""
         self.is_running = True
-        self.log("Bot started!")
+        self.log("Bot started!", "SUCCESS")
+        
+        # Test connection
+        messages = self.get_messages(1)
+        if messages:
+            self.log("Connected to Discord!", "SUCCESS")
+        else:
+            self.log("Connection test failed", "WARNING")
+        
+        # Start all loops
+        await asyncio.gather(
+            self.hunt_battle_loop(),
+            self.pray_loop(),
+            self.daily_loop(),
+            self.sell_loop()
+        )
     
     async def stop_bot(self):
         """Stop the bot"""
         self.is_running = False
-        for task in self.tasks_list:
-            task.cancel()
-        self.tasks_list = []
-        self.log("Bot stopped!")
+        self.log("Bot stopped!", "WARNING")
+    
+    async def close(self):
+        """Cleanup"""
+        await self.stop_bot()
+
+    async def start(self, token):
+        """Start with token (compatibility method)"""
+        await self.start_bot()
